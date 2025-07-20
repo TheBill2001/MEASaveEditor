@@ -1,0 +1,62 @@
+name: Build - Windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: msys2 {0}
+
+jobs:
+  prepare-prefix:
+    name: Prepare prefix
+    uses: ./.github/workflows/prepare-prefix-windows.yml
+    with:
+      qt-version: ${{ vars.QT_VERSION }}
+      kf-version: ${{ vars.KF_VERSION }}
+  build:
+    name: Build MEASaveEditor
+    needs: [prepare-prefix]
+    runs-on: windows-latest
+    env:
+      QT_ROOT_DIR: ${{ github.workspace }}/${{ needs.prepare-prefix.outputs.qt-root-dir }}
+    steps:
+    - name: Restore cache
+      uses: actions/cache/restore@v4
+      with:
+        path: prefix
+        key: ${{ needs.prepare-prefix.outputs.prefix-cache-key }}
+        fail-on-cache-miss: true
+    - name: Setup msys2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: CLANG64
+        update: true
+        pacboy: >-
+          toolchain:p
+          clang:p
+          extra-cmake-modules:p
+          cmake:p
+          ninja:p
+          zlib:p
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        path: app-source
+    - name: Configure
+      run: |
+        cmake -S app-source -B app-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+          -DCMAKE_INSTALL_PREFIX="$PWD/artifacts/MEASaveEditor"
+    - name: Build
+      run: cmake --build app-build --parallel
+    - name: Install
+      run: cmake --install app-build
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MEASaveEditor
+        path: artifacts

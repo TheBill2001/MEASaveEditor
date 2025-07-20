@@ -1,0 +1,78 @@
+name: Prepare Prefix - Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      qt-version:
+        required: true
+        type: string
+      kf-version:
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      qt-version:
+        required: true
+        type: string
+      kf-version:
+        required: true
+        type: string
+    outputs:
+      qt-root-dir:
+        value: ${{ jobs.build.outputs.qt-root-dir }}
+      prefix-cache-key:
+        value: ${{ jobs.build.outputs.prefix-cache-key }}
+
+defaults:
+  run:
+    shell: msys2 {0}
+
+jobs:
+  build:
+    name: Prepare Prefix
+    runs-on: windows-latest
+    outputs:
+      qt-root-dir: ${{ steps.output.outputs.qt-root-dir }}
+      prefix-cache-key: ${{ steps.output.outputs.prefix-cache-key }}
+    steps:
+    - name: Check cache
+      id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: prefix
+        key: ${{ runner.os }}-Qt_${{ inputs.qt-version }}-KF_${{ inputs.kf-version }}
+        lookup-only: true
+    - name: Setup msys2
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: CLANG64
+        update: true
+        install: >-
+          git
+        pacboy: >-
+          toolchain:p
+          clang:p
+          extra-cmake-modules:p
+          cmake:p
+          ninja:p
+          zlib:p
+          python:p
+    - name: Checkout
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v4
+    - name: Build
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: ./make-prefix.sh --prefix "$PWD/prefix" --qt-version "${{ inputs.qt-version }}" --kf-version "${{ inputs.kf-version }}" --clean-up
+    - name: Save cache
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: prefix
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+    - name: Output
+      id: output
+      shell: pwsh
+      run: |
+        Write-Output "qt-root-dir=prefix/${{ inputs.qt-version }}/llvm-mingw_64" >> $Env:GITHUB_OUTPUT
+        Write-Output "prefix-cache-key=${{ steps.cache.outputs.cache-primary-key }}" >> $Env:GITHUB_OUTPUT

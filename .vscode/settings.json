@@ -1,0 +1,11 @@
+{
+    "editor.formatOnSave": true,
+    "clangd.arguments": [
+        "--header-insertion=never",
+        "--parse-forwarding-functions"
+    ],
+    "C_mantic.headerGuard.defineFormat": "MEASE_${FILE_NAME}_${EXT}",
+    "cmake.debugConfig": {
+        "type": "lldb-dap",
+    }
+}
